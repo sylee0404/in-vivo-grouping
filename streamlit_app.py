@@ -7,7 +7,7 @@ import streamlit as st
 st.set_page_config(page_title="실험동물 균등 그룹핑 도구", layout="wide")
 
 st.title("🧪 In Vivo 실험동물 체중 & von Frey 균등 분배 도구")
-st.markdown("엑셀 데이터를 업로드하면 **Z-Score 가중치**와 **스네이크 분배(Serpentine) 알고리즘**을 통해 설정한 그룹 수에 맞춰 평균이 균등해지도록 자동 배정합니다.")
+st.markdown("엑셀 데이터를 업로드하면 **Z-Score 가중치**와 **스네이크 분배 알고리즘**을 통해 12개 그룹의 평균이 균등해지도록 자동 배정합니다.")
 
 # 1. 파일 업로더
 uploaded_file = st.file_uploader("실험 데이터 엑셀 파일(.xlsx, .xls)을 올려주세요", type=["xlsx", "xls"])
@@ -44,34 +44,12 @@ if uploaded_file is not None:
         with c2:
             bw_col = st.selectbox("2순위: Bodyweight (체중) 컬럼", cols, index=cols.index(bw_default))
             
-        st.markdown("#### 👥 그룹 설정")
-        g_col1, g_col2 = st.columns([1, 3])
-        
-        with g_col1:
-            # 그룹 수 사용자 입력 (기본값 7)
-            num_groups = st.number_input("나눌 그룹 수", min_value=2, max_value=30, value=7, step=1)
-            
-        with g_col2:
-            # 기본 예시 그룹명 자동 구성 (Vehicle, Drug A..., Normal 등)
-            default_names = ["Vehicle"] + [f"Drug_{chr(65+i)}" for i in range(num_groups - 2)] + ["Normal"] if num_groups >= 2 else ["Group 1", "Group 2"]
-            default_names_str = ", ".join(default_names[:num_groups])
-            
-            group_names_input = st.text_input(
-                "그룹 이름 (쉼표 ','로 구분하여 입력)",
-                value=default_names_str,
-                help="입력한 그룹 수가 맞지 않으면 자동으로 'Group 1, Group 2...' 형태로 보정됩니다."
-            )
-
-        # 그룹명 파싱 및 개수 맞추기
-        parsed_names = [name.strip() for name in group_names_input.split(",") if name.strip()]
-        group_names = []
-        for i in range(num_groups):
-            if i < len(parsed_names):
-                group_names.append(parsed_names[i])
-            else:
-                group_names.append(f"Group {i+1}")
-
-        st.caption(f"📌 최종 적용 그룹 목록 ({num_groups}개): {' | '.join(group_names)}")
+        group_names = [
+            'Vehicle', 'Librela(시판)', 'Librela(BN)', '19-5(histidine)', 
+            '19-5(PBS)', '19-5(hybridoma)', '128-2(histidine)', '128-2(PBS)', 
+            '128-2(hybridoma)', '9-1(histidine)', '9-1(PBS)', 'Normal'
+        ]
+        num_groups = len(group_names)
 
         if st.button("🚀 최적 그룹핑(Stratified Randomization) 실행", type="primary"):
             # 결측치 처리 및 숫자형 변환
@@ -81,7 +59,7 @@ if uploaded_file is not None:
             work_df = work_df.dropna(subset=[vf_col, bw_col])
             
             if len(work_df) < num_groups:
-                st.error(f"유효 데이터 수({len(work_df)}개)가 설정한 그룹 수({num_groups}개)보다 적습니다.")
+                st.error(f"유효 데이터 수({len(work_df)}개)가 배정할 그룹 수({num_groups}개)보다 적습니다.")
             else:
                 # Z-Score 정규화 및 통합 점수 계산
                 work_df['VF_Z'] = (work_df[vf_col] - work_df[vf_col].mean()) / work_df[vf_col].std()
@@ -91,7 +69,7 @@ if uploaded_file is not None:
                 # 통합 점수 기준 내림차순 정렬
                 df_sorted = work_df.sort_values(by='Combined_Score', ascending=False).reset_index(drop=True)
                 
-                # 스네이크 분배(Serpentine) 알고리즘 적용
+                # 스네이크 분배 알고리즘 적용
                 groups = {i: [] for i in range(1, num_groups + 1)}
                 for i, row in df_sorted.iterrows():
                     round_num = i // num_groups
@@ -122,10 +100,10 @@ if uploaded_file is not None:
                 final_df = pd.concat(final_rows, ignore_index=True)
                 summary_df = pd.DataFrame(summary_data)
                 
-                st.success(f"✅ 총 {num_groups}개 그룹 배정이 성공적으로 완료되었습니다!")
+                st.success("✅ 그룹 배정이 성공적으로 완료되었습니다!")
                 
                 # 요약 통계 테이블
-                st.subheader(f"📊 {num_groups}개 그룹별 평균값 비교 (요약)")
+                st.subheader("📊 12개 그룹별 평균값 비교 (요약)")
                 st.dataframe(summary_df, use_container_width=True)
                 
                 # 발표용 비교 그래프
@@ -151,7 +129,7 @@ if uploaded_file is not None:
                 st.download_button(
                     label="📥 최적화된 결과 엑셀 다운로드 (.xlsx)",
                     data=excel_bytes,
-                    file_name=f"Optimized_Grouping_Result_{num_groups}Groups.xlsx",
+                    file_name="Optimized_Grouping_Result.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                     type="primary"
                 )
